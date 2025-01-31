@@ -5,9 +5,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.*;
 import java.util.Base64;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ChatServer {
     private static SecretKeySpec secretKey;
+    private static CopyOnWriteArrayList<ClientHandler> clients = new CopyOnWriteArrayList<>();
 
     public static void main(String[] args) throws Exception {
         // Establecer la clave AES
@@ -16,28 +18,14 @@ public class ChatServer {
 
         // Configuración del servidor
         ServerSocket serverSocket = new ServerSocket(12345);
-        System.out.println("Esperando conexión...");
-        Socket socket = serverSocket.accept(); // Esperar a que un cliente se conecte
-        System.out.println("Cliente conectado.");
+        System.out.println("Esperando conexiones...");
 
-        // Crear los streams de entrada y salida
-        DataInputStream in = new DataInputStream(socket.getInputStream());
-        DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-
-        // Recibir mensajes
-        String receivedMessage;
         while (true) {
-            receivedMessage = in.readUTF(); // Leer mensaje cifrado del cliente
-            System.out.println("\nMensaje Cifrado recibido del cliente: " + receivedMessage);
-            String decryptedMessage = decrypt(receivedMessage); // Descifrar el mensaje
-            System.out.println("Mensaje Descifrado: " + decryptedMessage);
-
-            // Responder con un mensaje cifrado
-            String response = "Respuesta del servidor";
-            System.out.println("Mensaje Original de Respuesta: " + response);
-            String encryptedResponse = encrypt(response); // Cifrar el mensaje de respuesta
-            System.out.println("Mensaje Cifrado de Respuesta: " + encryptedResponse);
-            out.writeUTF(encryptedResponse); // Enviar mensaje cifrado al cliente
+            Socket socket = serverSocket.accept(); // Esperar a que un cliente se conecte
+            System.out.println("Cliente conectado.");
+            ClientHandler clientHandler = new ClientHandler(socket);
+            clients.add(clientHandler);
+            new Thread(clientHandler).start(); // Iniciar un nuevo hilo para manejar la comunicación con el cliente
         }
     }
 
@@ -56,5 +44,53 @@ public class ChatServer {
         byte[] decodedMessage = Base64.getDecoder().decode(encryptedMessage); // Decodificar de Base64
         byte[] decryptedMessage = cipher.doFinal(decodedMessage); // Descifrar el mensaje
         return new String(decryptedMessage); // Convertir a cadena de texto
+    }
+
+    // Clase para manejar la comunicación con un cliente
+    static class ClientHandler implements Runnable {
+        private Socket socket;
+        private DataInputStream in;
+        private DataOutputStream out;
+
+        public ClientHandler(Socket socket) throws IOException {
+            this.socket = socket;
+            this.in = new DataInputStream(socket.getInputStream());
+            this.out = new DataOutputStream(socket.getOutputStream());
+        }
+
+        @Override
+        public void run() {
+            try {
+                String receivedMessage;
+                while (true) {
+                    receivedMessage = in.readUTF(); // Leer mensaje cifrado del cliente
+                    System.out.println("\nMensaje Cifrado recibido del cliente: " + receivedMessage);
+                    String decryptedMessage = decrypt(receivedMessage); // Descifrar el mensaje
+                    System.out.println("Mensaje Descifrado: " + decryptedMessage);
+
+                    // Retransmitir el mensaje descifrado a todos los clientes conectados
+                    for (ClientHandler client : clients) {
+                        if (client != this) {
+                            client.sendMessage(decryptedMessage);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                clients.remove(this);
+            }
+        }
+
+        // Método para enviar un mensaje cifrado al cliente
+        public void sendMessage(String message) throws Exception {
+            String encryptedMessage = encrypt(message); // Cifrar el mensaje
+            out.writeUTF(encryptedMessage); // Enviar mensaje cifrado al cliente
+        }
     }
 }

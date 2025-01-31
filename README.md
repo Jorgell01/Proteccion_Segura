@@ -28,28 +28,18 @@ Este proyecto implementa una aplicación de chat simple con un servidor y múlti
 
 ### Ejecutar el Servidor
 
-1. Navega al directorio `target`:
+1. Ejecuta el servidor usando Maven:
     ```sh
-    cd target
-    ```
-
-2. Ejecuta el servidor:
-    ```sh
-    java -cp <jar-file-name>.jar pgv.ChatServer
+    mvn exec:java -Dexec.mainClass="pgv.ChatServer"
     ```
 
 ### Ejecutar los Clientes
 
 1. Abre dos ventanas de terminal o instancias del IDE por separado.
 
-2. En cada terminal, navega al directorio `target`:
+2. En cada terminal, ejecuta el cliente usando Maven:
     ```sh
-    cd target
-    ```
-
-3. Ejecuta el cliente en cada terminal:
-    ```sh
-    java -cp <jar-file-name>.jar pgv.ChatCliente
+    mvn exec:java -Dexec.mainClass="pgv.ChatCliente"
     ```
 
 ### Cómo Funciona
